@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "fict-best-practices": {
+      "source": "fictjs/skill",
+      "sourceType": "github",
+      "skillPath": "skills/fict-best-practices/SKILL.md",
+      "computedHash": "238011526c7d09ab2ee44414b8563925a30965ca78eea1c6765d6d34da6769e0"
+    },
+    "fict-devtools-playground": {
+      "source": "fictjs/skill",
+      "sourceType": "github",
+      "skillPath": "skills/fict-devtools-playground/SKILL.md",
+      "computedHash": "068db2933ef0fafe5551117fb0a5375d958718156ddebcee3049947a6dcf52cb"
+    }
+  }
+}
