@@ -1,3 +1,7 @@
 packages:
   - admin
+  - admin-react
+  - admin-solid
+  - admin-svelte
+  - admin-vue
   - basic

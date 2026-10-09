@@ -11,11 +11,13 @@ export function List<T extends keyof Resources & string>({
   const record = getList.read(resourceName);
 
   const fields = resource.listFields || [];
+  const name = resource.name;
+  const showFields = resource.showFields;
   const data = record.data as Resources[T][] | undefined;
 
   return (
     <div class="list-view">
-      <h1>{resource.name}</h1>
+      <h1>{name}</h1>
       <table class="data-table">
         <thead>
           <tr>
@@ -32,8 +34,8 @@ export function List<T extends keyof Resources & string>({
                 <td key={f.source}>{String(row[f.source] ?? "")}</td>
               ))}
               <td>
-                {resource.showFields && (
-                  <a class="show-link" href={`#/${resource.name}/${row.id}`}>
+                {showFields && (
+                  <a class="show-link" href={`#/${name}/${row.id}`}>
                     Show
                   </a>
                 )}

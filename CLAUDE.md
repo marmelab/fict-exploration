@@ -4,22 +4,25 @@ This project uses **Fict**, a compile-time reactive UI framework. Write plain Ja
 
 ## Project Structure
 
-pnpm workspace (`pnpm-workspace.yaml`) with two demo packages:
+pnpm workspace (`pnpm-workspace.yaml`) with six packages:
 
-- `basic/` — minimal counter demo (`src/main.tsx`)
-- `admin/` — admin UI demo with List/Show views and a `dataProvider` (`src/admin/`)
+- `basic/` — minimal Fict counter demo (`src/main.tsx`)
+- `admin/` — Fict admin UI demo with List/Show views and a `dataProvider` (`src/admin/`)
+- `admin-react/`, `admin-solid/`, `admin-svelte/`, `admin-vue/` — the same admin in React 19, Solid 1.9, Svelte 5 and Vue 3.6 Vapor (a release candidate, `3.6.0-rc.9`), for comparison. Same features, routing, API and CSS.
 
-Both packages depend on `fict@^0.18.0` and build with Vite + `@fictjs/vite-plugin`.
+The Fict packages depend on `fict@^0.36.0` and build with Vite 8 + `@fictjs/vite-plugin@^0.36.0`. This file describes the Fict 0.36 API.
 
 ## Commands
 
 ```bash
 pnpm install                  # install workspace deps
+pnpm dev:admin                # dev servers for all five admins
+pnpm build                    # build every package
 pnpm -F fict-basic dev        # dev server for basic
 pnpm -F fict-admin dev        # dev server for admin
 pnpm -F fict-admin build      # tsc && vite build
 pnpm -F fict-admin lint       # eslint (admin only)
-pnpm -F fict-basic build
+pnpm -F admin-solid build     # same for admin-react, admin-svelte, admin-vue
 ```
 
 ## Golden Rules
@@ -30,6 +33,29 @@ pnpm -F fict-basic build
 4. **Use native JS control flow.** `if`/`else`, ternaries, `.map()` — no special components needed.
 5. **Props destructuring is safe.** Reactivity is preserved through destructured props.
 6. **`$state` only at top level.** Not inside conditionals or loops.
+7. **Import every macro.** `$state`, `$effect`, `$memo` and `$store` must be imported from `"fict"`, or the build fails with `FICT-HIR-MACRO-UNBOUND`.
+
+---
+
+## Fict 0.36 Strict Mode — Read This First
+
+`strictGuarantee` is on by default and forced on in production builds. When the compiler can't prove an update will propagate, the build fails. `FICT-R002`, `FICT-R005` and `FICT-H` cannot be suppressed (`fict-ignore` is rejected): change the code.
+
+| Symptom | Fix |
+| --- | --- |
+| `FICT-R005` when writing `$state` from a callback given to the browser (`addEventListener`, `setInterval`) | Use a component-level `$store` written from `onMount`, or a `createSignal` from `fict/advanced` |
+| `FICT-R002` when passing a prop-derived value to an unknown function (`resource.read({ name: resource.name })`) | Name it in a `const` first. The `reactive(() => …)` accessor only compiles when the resource is declared in the same module |
+| `FICT-R002`/`R005` on a `.map()` callback that reads a prop object | Hoist the members into `const`s above the JSX (`const name = resource.name`) |
+| `FICT-H` on `obj[key]` where `obj` is reactive | Move the lookup into a helper that takes the object as a parameter |
+
+Silent traps (no diagnostic at all):
+
+- Reading a `createSignal` accessor into a component-level `const` freezes it. Only `$state`, `$store` and props seed derived memos. Read signals inside JSX or inside functions.
+- Array destructuring with a default (`const [a = "", b] = path.split("/")`) is not memoized, so it freezes too.
+- `.map()` + `key` compiles to a keyed list over `$state`, but not over `createSignal` or `$store`: every change rebuilds all rows. Check the emitted code for `createKeyedList`.
+- An `ErrorBoundary` fallback written as a named helper returning JSX renders an empty element for async errors (a resource rejecting inside `<Suspense>`). Write the fallback inline, or have the helper return a component element.
+
+Tooling: the Vite plugin doesn't print compiler warnings unless you pass `onWarn`, and `@fictjs/eslint-plugin` reports none of the strict diagnostics. To iterate on one file, call `transformSync({ protocolVersion: COMPILER_PROTOCOL_VERSION, filename, code, options: {} })` from `@fictjs/compiler`: it returns `diagnostics` and the emitted `code`.
 
 ---
 
@@ -325,7 +351,9 @@ Suspense props: `fallback`, `onResolve`, `onReject`, `resetKeys`.
 
 ```tsx
 import { resource } from "fict/plus";
+import { reactive } from "fict/advanced";
 
+// Declared in the same module as the component: `reactive()` only compiles then.
 const userResource = resource({
   fetch: async ({ signal }, userId: string) => {
     const res = await fetch(`/api/users/${userId}`, { signal });
@@ -336,7 +364,7 @@ const userResource = resource({
 });
 
 function UserCard({ userId }: { userId: string }) {
-  const user = userResource.read(() => userId);
+  const user = userResource.read(reactive(() => userId));
   // Without suspense: check user.loading, user.error, user.data
   // With suspense: user.data is guaranteed inside <Suspense>
   return <h2>{user.data?.name}</h2>;
@@ -494,4 +522,5 @@ const { pipe, shellReady, allReady } = renderToPipeableStream(() => <App />, {
 - **Do** use immutable patterns for `$state` arrays: `items = [...items, newItem]`.
 - **Do** use `$store` when you need deep mutation on nested objects.
 - **Do** provide unique, stable `key` props on list items.
-- **Do** use `createSignal` for module-level shared state outside components.
+- **Do** use `createSignal` for module-level shared state outside components, and read it inside JSX or functions, never into a `const`.
+- **Don't** extract an `ErrorBoundary` fallback into a helper that returns JSX directly: return a component element, or write it inline.

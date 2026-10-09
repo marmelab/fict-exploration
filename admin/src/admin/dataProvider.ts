@@ -35,7 +35,7 @@ export const getOne = resource<
 >({
   key: ({ resource, id }: { resource: keyof Resources; id: number }) =>
     `${resource}/${id}`,
-  suspense: false,
+  suspense: true,
   fetch: async (
     { signal },
     {

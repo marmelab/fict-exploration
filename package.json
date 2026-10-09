@@ -2,5 +2,10 @@
   "name": "fict-demo",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "pnpm@10.28.0"
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:admin": "pnpm --filter fict-admin --filter \"admin-*\" --parallel run dev",
+    "build": "pnpm -r run build"
+  }
 }
