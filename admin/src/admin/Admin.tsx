@@ -1,5 +1,4 @@
-import { $effect, ErrorBoundary, Suspense } from "fict";
-import { createSignal } from "fict/advanced";
+import { $store, ErrorBoundary, onMount, Suspense } from "fict";
 import { List } from "./List";
 import { Show } from "./Show";
 import type { Resources } from "./types";
@@ -23,14 +22,8 @@ export type ResourceConfigs = AnyResourceConfig[];
 
 type Route = { resource: string; id: number | null };
 
-// The location hash lives in a module-level signal because its writes come from
-// a DOM event listener, which sits outside any component's reactive ownership.
-const hashSignal = createSignal(window.location.hash);
-
-// Call this from inside a JSX expression: each read re-runs when the hash
-// changes. Assigning it to a plain `const` in a component would freeze it.
-function currentRoute(): Route {
-  const path = hashSignal().replace(/^#\/?/, "");
+function parseRoute(hash: string): Route {
+  const path = hash.replace(/^#\/?/, "");
   const [resource = "", idStr] = path.split("/");
   const id = idStr != null ? parseInt(idStr, 10) : NaN;
   return { resource, id: !isNaN(id) ? id : null };
@@ -58,7 +51,8 @@ function errorFallback(err: unknown) {
   );
 }
 
-// The route arrives as a prop so everything derived from it stays reactive.
+// A separate component, so the early returns below only swap the content area
+// and leave the sidebar in place.
 function AdminContent({
   resources,
   route,
@@ -106,11 +100,19 @@ function AdminContent({
 }
 
 export function Admin({ resources }: { resources: ResourceConfigs }) {
-  $effect(() => {
-    const handler = () => hashSignal(window.location.hash);
+  // The hash is written from a DOM event listener. Writing a `$state` there
+  // fails strict mode (FICT-R005: the callback escapes its reactive owner),
+  // but a `$store` created in the component can be written from it, and a
+  // `const` derived from the store stays reactive.
+  const router = $store({ hash: window.location.hash });
+
+  onMount(() => {
+    const handler = () => (router.hash = window.location.hash);
     window.addEventListener("hashchange", handler);
     return () => window.removeEventListener("hashchange", handler);
   });
+
+  const route = parseRoute(router.hash);
 
   return (
     <div class="admin-layout">
@@ -123,7 +125,7 @@ export function Admin({ resources }: { resources: ResourceConfigs }) {
             <li key={r.name}>
               <a
                 href={`#/${r.name}`}
-                class={currentRoute().resource === r.name ? "active" : ""}
+                class={route.resource === r.name ? "active" : ""}
               >
                 {r.name}
               </a>
@@ -132,7 +134,7 @@ export function Admin({ resources }: { resources: ResourceConfigs }) {
         </ul>
       </nav>
       <main class="admin-content">
-        <AdminContent resources={resources} route={currentRoute()} />
+        <AdminContent resources={resources} route={route} />
       </main>
     </div>
   );
